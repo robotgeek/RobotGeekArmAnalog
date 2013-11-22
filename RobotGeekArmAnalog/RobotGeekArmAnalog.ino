@@ -7,8 +7,6 @@
 //  
 //=============================================================================
 
-
-
 #include <Servo.h>
 
 //define analog pins that will be connected to the joystick pins
@@ -35,8 +33,8 @@ Servo GRI_SERVO;  //
 #define ELBOW_MAX     2400
 #define WRIST_MIN     600
 #define WRIST_MAX     2400 
-#define GRIPPER_MIN   800
-#define GRIPPER_MAX   1800 
+#define GRIPPER_MIN   900
+#define GRIPPER_MAX   2100 
 
 //generic deadband limits - not all joystics will center at 512, so these limits remove 'drift' from joysticks that are off-center.
 #define DEADBANDLOW 462
