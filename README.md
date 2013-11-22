@@ -5,8 +5,7 @@ RobotGeek Snapper Arm Analog Control Example Code
 
 This is a code example for the RobotGeek Snapper Arm, providing direct manual control of the robot's axis via analog input.
 
-Five analog inputs devices are used, two Rotational knobs for the Base Rotation and Gripper, and three joysticks for 
-incremental control of the Shoulder, Elbow, and Wrist servos.
+Five analog inputs devices are used, two Rotational knobs for the Base Rotation and Gripper, and three joysticks (vertical axis only) for incremental control of the Shoulder, Elbow, and Wrist servos.
 
 
 Analog IO:
