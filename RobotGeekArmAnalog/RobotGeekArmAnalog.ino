@@ -1,66 +1,129 @@
-// RobotGeek Robot Arm Manual Joystick control code
-//=============================================================================
-//
-//  This code is a Work In Progress and is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
-//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
-//  
-//=============================================================================
-
+/***********************************************************************************
+ *  }--\     RobotGeek Snapper Robotic Arm     /--{
+ *      |         Analog Control Code         |
+ *   __/                                       \__
+ *  |__|                                       |__|
+ *
+ *
+ *  The following sketch will move each joint of the arm based on analog inputs.
+ *
+ *  Snapper Arm Getting Started Guide
+ *  http://learn.trossenrobotics.com/33-robotgeek-getting-started-guides/robotgeek-snapper-robot-arm/63-robotgeek-snapper-arm-getting-started-guide
+ *
+ *
+ *  WIRING
+ *    Servos
+ *      Digital I/O 3 - Base Rotation - Robot Geek Servo 
+ *      Digital I/O 5 - Shoulder Joint - Robot Geek Servo 
+ *      Digital I/O 6 - Elbow Joint - Robot Geek Servo 
+ *      Digital I/O 9 - Wrist Joint - Robot Geek Servo 
+ *      Digital I/O 10 - Gripper Servo - 9g Servo 
+ *
+ *    Analog Inputs
+ *      Analog 0 - Rotation Knob 
+ *      Analog 1 - Joystick (Vertical)
+ *      Analog 2 - Joystick (Vertical)
+ *      Analog 3 - Joystick (Vertical)
+ *      Analog 4 - Rotation Knob 
+ *  
+ *    Use an external power supply and set both PWM jumpers to 'VIN'
+ *
+ *  CONTROL
+ *    Turn the 
+ *
+ *
+ *  NOTES
+ *    ANALOG INPUT MAPPING
+ *      This code uses a combination of direct and incremental code for converting 
+ *      analog inputs into servo positions
+ *    
+ *      Direct/Absolute
+ *        Absolute positioning is used for the knobs controlling the base and gripper servo.
+ *        This means that the value of the knob is mapped directly to the corresponding servo
+ *        value. This method is ideal for sensors that stay at static positions such as
+ *        knobs and sliders. 
+ *    
+ *      Incremental
+ *        Incremental code is used for the joysticks controlling the shoulder, elbow and
+ *        gripper servo. Each joystick value is mapped to a small realtiveley small positive
+ *        or negative value. This value is then added to the currrent position of the servo.
+ *        The action of slowly moving the joystick away from its center position can slowly 
+ *        move each joint of the robot. When the joystick is centered, no movement is made
+ *     
+ *      The choice for using Direct/Incremental mapping for each joint was made based
+ *      on usability, however the code can be modified so that any joint can use
+ *      either direct or incremental mapping
+ *
+ *    SERVO POSITIONS
+ *      The servos' positions will be tracked in microseconds, and written to the servos
+ *      using .writeMicroseconds()
+ *        http://arduino.cc/en/Reference/ServoWriteMicroseconds
+ *      For RobotGeek servos, 600ms corresponds to fully counter-clockwise while
+ *      2400ms corresponds to fully clock-wise. 1500ms represents the servo being centered 
+ *
+ *      For the 9g servo, 900ms corresponds to fully counter-clockwise while
+ *      2100ms corresponds to fully clock-wise. 1500ms represents the servo being centered 
+ *
+ *
+ *  This code is a Work In Progress and is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+ *  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+ ***********************************************************************************/
 #include <Servo.h>
 
 //define analog pins that will be connected to the joystick pins
-#define BASE     0
-#define SHOULDER 1
-#define ELBOW    2
-#define WRIST    3
-#define GRIPPER  4
+#define BASE     0  //connected to Rotation Knob / Potentiometer # 1
+#define SHOULDER 1  //connected to Vertical Axis on Joystick # 1
+#define ELBOW    2  //connected to Vertical Axis on Joystick # 2
+#define WRIST    3  //connected to Vertical Axis on Joystick # 3
+#define GRIPPER  4  //connected to Rotation Knob / Potentiometer # 2
 
-// Declare servos for Servo library
-Servo BAS_SERVO;  // 
-Servo SHL_SERVO;  // 
-Servo ELB_SERVO;  // 
-Servo WRI_SERVO;  // 
-Servo WRO_SERVO;  // 
-Servo GRI_SERVO;  // 
-
-// Servo position limitations
-#define BASE_MIN      600
-#define BASE_MAX      2400
+// Servo position limitations - limits in microseconds
+#define BASE_MIN      600     //full counterclockwise for RobotGeek 180 degree servo
+#define BASE_MAX      2400    //full clockwise for RobotGeek 180 degree servo
 #define SHOULDER_MIN  600
 #define SHOULDER_MAX  2400
 #define ELBOW_MIN     600
 #define ELBOW_MAX     2400
 #define WRIST_MIN     600
 #define WRIST_MAX     2400 
-#define GRIPPER_MIN   900
-#define GRIPPER_MAX   2100 
+#define GRIPPER_MIN   900    //full counterclockwise for 9g servo
+#define GRIPPER_MAX   2100   //full clockwise for 9g servo
 
 //generic deadband limits - not all joystics will center at 512, so these limits remove 'drift' from joysticks that are off-center.
-#define DEADBANDLOW 462
-#define DEADBANDHIGH 662
+#define DEADBANDLOW 462   //decrease this value if drift occurs, increase it to increase sensitivity around the center position
+#define DEADBANDHIGH 562  //increase this value if drift occurs, decrease it to increase sensitivity around the center position
 
+// Declare servo objects
+Servo BAS_SERVO;    //base servo - RobotGeek Servo
+Servo SHL_SERVO;    //shoulder servo - RobotGeek Servo 
+Servo ELB_SERVO;    //elbow servo - RobotGeek Servo 
+Servo WRI_SERVO;    //wrist servo - RobotGeek Servo
+Servo WRO_SERVO;    //wrist rotate servo - RobotGeek Servo (unused for snapper arm)        
+Servo GRI_SERVO;    //gripper servo - 9g servo
 
-int Base     =1500;     //current position of the Base servo
-int Shoulder =1500;    //current position of the Shoulder servo  
-int Elbow    =1500;   //current position of the Elbow servo
-int Wrist    =1500;  //current position of the Wrist servo
-int Gripper  =1500; //current position of the Gripper servo
+//present positions of the servos 
+int Base     =1500;    //holds the present position of the Base servo, starts at 1500 (centered)
+int Shoulder =1500;    //holds the present position of the Shoulder servo, starts at 1500 (centered)
+int Elbow    =1500;    //holds the present position of the Elbow servo, starts at 1500 (centered)
+int Wrist    =1500;    //holds the present position of the wrist servo, starts at 1500 (centered)
+int Gripper  =1500;    //holds the present position of the gripper servo, starts at 1500 (centered)
 
+//last read values of analog sensors (Native values, 0-1023)
+int joyBaseVal = 0;     //present value of the base rotation knob (analog 0)
+int joyShoulderVal = 0; //present value of the shoulder joystick (analog 1)
+int joyElbowVal = 0;    //present value of the elbow joystick (analog 2)
+int joyWristVal = 0;    //present value of the wrist joystick (analog 3)
+int joyGripperVal = 0;  //present value of the gripper rotation knob (analog 4)
 
-int joyBaseVal = 0;      //current value of the Base input (analog 0)
-int joyShoulderVal = 0;  //current value of the Shoulder input (analog 1)
-int joyElbowVal = 0;
-int joyWristVal = 0;
-int joyGripperVal = 0;
-
-
-int joyBaseMapped = 0;//tilt joystick value, mapped from 1-1023 to -500-500
-int joyShoulderMapped = 0;//pan joystick value, mapped from 1-1023 to -500-500
-int joyElbowMapped = 0;//tilt joystick value, mapped from 1-1023 to -500-500
-int joyWristMapped = 0;//pan joystick value, mapped from 1-1023 to -500-500
-int joyGripperMapped = 0;//tilt joystick value, mapped from 1-1023 to -500-500
-
+//last calculated values of analog sensors (Mapped values)
+//knob values (base and gripper) will be mapped directly to the servo limits
+//joystick values (shoulder, elbow and wrist) will be mapped from -speed to speed, to faciliate incremental control
+int joyBaseMapped = 0;      //base knob value, mapped from 1-1023 to BASE_MIN-BASE_MAX
+int joyShoulderMapped = 0;  //shoulder joystick value, mapped from 1-1023 to -speed to speed
+int joyElbowMapped = 0;     //elbow joystick value, mapped from 1-1023 to -speed to speed
+int joyWristMapped = 0;     //wrist joystick value, mapped from 1-1023 to -speed to speed
+int joyGripperMapped = 0;   //gripper knob  value, mapped from 1-1023 to GRIPPER_MIN-GRIPPER_MAX
 
 int speed = 10;  //speed modififer, increase this to increase the speed of the movement
 
@@ -68,7 +131,8 @@ int speed = 10;  //speed modififer, increase this to increase the speed of the m
 //===================================================================================================
 // Setup 
 //====================================================================================================
-void setup() {
+void setup() 
+{
 
   // Attach servo and set limits
   BAS_SERVO.attach(3, BASE_MIN, BASE_MAX);
@@ -77,57 +141,55 @@ void setup() {
   WRI_SERVO.attach(9, WRIST_MIN, WRIST_MAX);
   GRI_SERVO.attach(10, GRIPPER_MIN, GRIPPER_MAX);
   
-
-  delay(1000);
+  delay(1000);  //wait 1 second
   
-  // Move servos to center
-  set_servo();
-
+  set_servo();  // Move servos to defualt positions
 }
 
-void loop() {
+void loop() 
+{
   
-   //read analog values from joysticks
+   //read analog values from analog sensors
    joyBaseVal = analogRead(BASE);
    joyShoulderVal = analogRead(SHOULDER);
    joyElbowVal = analogRead(ELBOW);
    joyWristVal = analogRead(WRIST);
    joyGripperVal = analogRead(GRIPPER);
         
-   //Mapping analog joystick value to servo PWM signal range
-     joyBaseMapped = map(joyBaseVal, 1023, 0, BASE_MIN, BASE_MAX);
-     Base = joyBaseMapped;
+   
+   joyBaseMapped = map(joyBaseVal, 1023, 0, BASE_MIN, BASE_MAX);  //Mapping analog knob value to servo PWM signal range
+   Base = joyBaseMapped; //set servo position variable to the mapped value from the knob
     
-   //deadzone and incremental code for Joystick values
+   //only update the shoulder joint if the joystick is outside the deadzone (i.e. moved oustide the center position)
    if(joyShoulderVal > DEADBANDHIGH || joyShoulderVal < DEADBANDLOW)
    {
-     joyShoulderMapped = map(joyShoulderVal, 0, 1023, -speed, speed);
-     Shoulder += joyShoulderMapped;
+     joyShoulderMapped = map(joyShoulderVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
+     Shoulder = Shoulder + joyShoulderMapped; //add mapped shoulder joystick value to present present Shoulder Value (positive values of joyShoulderMapped will increase the position, negative values will decrease the position)
    }
 
-   //deadzone and incremental code for Joystick values  
+   //only update the elbow joint if the joystick is outside the deadzone (i.e. moved oustide the center position)
    if(joyElbowVal > DEADBANDHIGH || joyElbowVal < DEADBANDLOW)
    {
-     joyElbowMapped = map(joyElbowVal, 0, 1023, -speed, speed);
-     Elbow -= joyElbowMapped;
+     joyElbowMapped = map(joyElbowVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
+     Elbow = Elbow + joyElbowMapped;//add mapped elbow joystick value to present present elbow Value (positive values of joyElbowMapped will increase the position, negative values will decrease the position)
    }
+   
 
-   //deadzone and incremental code for Joystick values 
+   //only update the wrist joint if the joystick is outside the deadzone (i.e. moved oustide the center position)
    if(joyWristVal > DEADBANDHIGH || joyWristVal < DEADBANDLOW)
    {
-     joyWristMapped = map(joyWristVal, 0, 1023, -speed, speed);
-     Wrist -= joyWristMapped;
+     joyWristMapped = map(joyWristVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
+     Wrist = Wrist + joyWristMapped;//add mapped wrist joystick value to present present wrist Value (positive values of joyWristMapped will increase the position, negative values will decrease the position)
    }
    
-   //Mapping analog joystick value to servo PWM signal range
-     joyGripperMapped = map(joyGripperVal, 0, 1023, GRIPPER_MIN, GRIPPER_MAX);
-     Gripper = joyGripperMapped;
-
-
    
+   //Mapping analog joystick value to servo PWM signal range
+   joyGripperMapped = map(joyGripperVal, 0, 1023, GRIPPER_MIN, GRIPPER_MAX);
+   Gripper = joyGripperMapped;//set servo position variable to the mapped value from the knob
+
       
     //enforce upper/lower limits for servo position variable 
-    //(actual servo positions min/max are setup above, this is just for variable)
+    //(actual servo positions min/max are setup above as a part of .attach(), this is just for variable)
     if (Base < BASE_MIN)
     {
       Base =BASE_MIN;
@@ -137,7 +199,7 @@ void loop() {
       Base =BASE_MAX;
     }
     
-    
+    //enforce upper/lower limits for shoulder servo
     if (Shoulder < SHOULDER_MIN)
     {
       Shoulder =SHOULDER_MIN;
@@ -150,7 +212,7 @@ void loop() {
   
   
   
-    //enforce upper/lower limits for tilt servo
+    //enforce upper/lower limits for elbow servo
     if (Elbow < ELBOW_MIN)
     {
       Elbow = ELBOW_MIN;
@@ -161,7 +223,7 @@ void loop() {
     }
     
     
-    //enforce upper/lower limits for pan servo
+    //enforce upper/lower limits for wrist servo
     if (Wrist < WRIST_MIN)
     {
       Wrist = WRIST_MIN;
@@ -173,7 +235,7 @@ void loop() {
     }
   
   
-      //enforce upper/lower limits for tilt servo
+    //enforce upper/lower limits for gripper servo
     if (Gripper < GRIPPER_MIN)
     {
       Gripper =GRIPPER_MIN;
@@ -188,6 +250,32 @@ void loop() {
   }
 
 
+/******************************************************
+ *  set_servo()
+ *
+ *  This function sets the 5 servos on the snapper arm
+ *  to the 5 positions variables. All servos and
+ *  positions variables are globals 
+ *
+ *  Parameters:
+ *    none
+  *
+ *  Globals Used:
+ *      Servo BAS_SERVO
+ *      Servo WRI_SERVO
+ *      Servo SHL_SERVO
+ *      Servo ELB_SERVO
+ *      Servo GRI_SERVO
+ *      int Base
+ *      int Wrist
+ *      int Shoulder
+ *      int Elbow
+ *      int Gripper
+ *
+ *  Returns: 
+ *    none
+ ******************************************************/ 
+
 void set_servo()
 {
   BAS_SERVO.writeMicroseconds(Base);
@@ -199,17 +287,3 @@ void set_servo()
 }
 
 
-void servo_park()
-{
-  BAS_SERVO.writeMicroseconds(1500);
-  delay(10);
-  SHL_SERVO.writeMicroseconds(900);
-  delay(10);
-  ELB_SERVO.writeMicroseconds(800);
-  delay(10);
-  WRI_SERVO.writeMicroseconds(1500);
-  delay(10);  
-  GRI_SERVO.writeMicroseconds(900);
-  delay(10); 
-  return;
-}
