@@ -20,7 +20,7 @@
  *      Digital I/O 10 - Gripper Servo - 9g Servo 
  *
  *    Analog Inputs
- *      Analog 0 - Rotation Knob 
+ *      Analog 0 - Joystick (Horizontal)
  *      Analog 1 - Joystick (Vertical)
  *      Analog 2 - Joystick (Vertical)
  *      Analog 3 - Joystick (Vertical)
@@ -70,6 +70,12 @@
  *  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
  ***********************************************************************************/
 #include <Servo.h>
+
+// Original v1.0 Arm using Rotation Knob/Absolute control for Base input. Uncomment next line to use v1.0 code (v11 define must be commented out).
+//#define v10
+
+// Revised v1.1 Arm using Incremental Joystick Lever for Base Input. Uncomment next line to use v1.1 code (v10 define must be commented out)
+#define v11
 
 //define analog pins that will be connected to the joystick pins
 #define BASE     0  //connected to Rotation Knob / Potentiometer # 1
@@ -155,23 +161,36 @@ void loop()
    joyElbowVal = analogRead(ELBOW);
    joyWristVal = analogRead(WRIST);
    joyGripperVal = analogRead(GRIPPER);
-        
-   
-   joyBaseMapped = map(joyBaseVal, 1023, 0, BASE_MIN, BASE_MAX);  //Mapping analog knob value to servo PWM signal range
-   Base = joyBaseMapped; //set servo position variable to the mapped value from the knob
     
+// Base joint is handled differently depending upon analog control solution. v1.0 Snapper Arms used a rotational knob with direct/absolute control of the base servo, where v1.1 Snapper Arms use an incremental Joystick.    
+        
+#ifdef v10   
+   joyBaseMapped = map(joyBaseVal, 1023, 0, BASE_MIN, BASE_MAX);  //Mapping analog knob value to servo PWM signal range
+   Base = joyBaseMapped; //set servo position variable to the mapped value from the knob. Absolute/direct control.
+#endif
+
+#ifdef v11   
+   //only update the base joint if the joystick is outside the deadzone (i.e. moved oustide the center position)
+   if(joyBaseVal > DEADBANDHIGH || joyBaseVal < DEADBANDLOW)
+   {
+     joyBaseMapped = map(joyBaseVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
+     Base += joyBaseMapped; //add mapped base joystick value to present Base Value (positive values of joyBaseMapped will increase the position, negative values will decrease the position)
+   }
+#endif
+
+
    //only update the shoulder joint if the joystick is outside the deadzone (i.e. moved oustide the center position)
    if(joyShoulderVal > DEADBANDHIGH || joyShoulderVal < DEADBANDLOW)
    {
      joyShoulderMapped = map(joyShoulderVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
-     Shoulder = Shoulder + joyShoulderMapped; //add mapped shoulder joystick value to present present Shoulder Value (positive values of joyShoulderMapped will increase the position, negative values will decrease the position)
+     Shoulder = Shoulder + joyShoulderMapped; //add mapped shoulder joystick value to present Shoulder Value (positive values of joyShoulderMapped will increase the position, negative values will decrease the position)
    }
 
    //only update the elbow joint if the joystick is outside the deadzone (i.e. moved oustide the center position)
    if(joyElbowVal > DEADBANDHIGH || joyElbowVal < DEADBANDLOW)
    {
      joyElbowMapped = map(joyElbowVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
-     Elbow = Elbow + joyElbowMapped;//add mapped elbow joystick value to present present elbow Value (positive values of joyElbowMapped will increase the position, negative values will decrease the position)
+     Elbow = Elbow + joyElbowMapped;//add mapped elbow joystick value to present elbow Value (positive values of joyElbowMapped will increase the position, negative values will decrease the position)
    }
    
 
@@ -179,7 +198,7 @@ void loop()
    if(joyWristVal > DEADBANDHIGH || joyWristVal < DEADBANDLOW)
    {
      joyWristMapped = map(joyWristVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
-     Wrist = Wrist + joyWristMapped;//add mapped wrist joystick value to present present wrist Value (positive values of joyWristMapped will increase the position, negative values will decrease the position)
+     Wrist = Wrist + joyWristMapped;//add mapped wrist joystick value to present wrist Value (positive values of joyWristMapped will increase the position, negative values will decrease the position)
    }
    
    
