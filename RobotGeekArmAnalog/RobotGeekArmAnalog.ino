@@ -195,7 +195,7 @@ void loop()
    if(joyShoulderVal > DEADBANDHIGH || joyShoulderVal < DEADBANDLOW)
    {
      joyShoulderMapped = map(joyShoulderVal, 0, 1023, -speed, speed); //Map analog value from native joystick value (0 to 1023) to incremental change (-speed to speed)
-     Shoulder = Shoulder + joyShoulderMapped; //add mapped shoulder joystick value to present Shoulder Value (positive values of joyShoulderMapped will increase the position, negative values will decrease the position)
+     Shoulder = Shoulder - joyShoulderMapped; //add mapped shoulder joystick value to present Shoulder Value (positive values of joyShoulderMapped will increase the position, negative values will decrease the position)
    }
 
    //only update the elbow joint if the joystick is outside the deadzone (i.e. moved oustide the center position)
