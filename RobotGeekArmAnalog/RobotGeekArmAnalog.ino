@@ -77,12 +77,15 @@
 // Revised v1.1 Arm using Incremental Joystick Lever for Base Input. Uncomment next line to use v1.1 code (v10 define must be commented out)
 #define v11
 
+// enables serial debugging via serial monitor @ 38400 baud. Outputs actual uS servo positions, including any offsets.
+//#define SERIAL_DEBUG
+
 //define analog pins that will be connected to the joystick pins
-#define BASE     0  //connected to Rotation Knob / Potentiometer # 1
-#define SHOULDER 1  //connected to Vertical Axis on Joystick # 1
-#define ELBOW    2  //connected to Vertical Axis on Joystick # 2
-#define WRIST    3  //connected to Vertical Axis on Joystick # 3
-#define GRIPPER  4  //connected to Rotation Knob / Potentiometer # 2
+#define BASE     0  //connected to Horizontal Axis on Joystick # 1
+#define SHOULDER 1  //connected to Vertical Axis on Joystick # 2
+#define ELBOW    2  //connected to Vertical Axis on Joystick # 3
+#define WRIST    3  //connected to Vertical Axis on Joystick # 4
+#define GRIPPER  4  //connected to Rotation Knob / Potentiometer # 1
 
 // Servo position limitations - limits in microseconds
 #define BASE_MIN      600     //full counterclockwise for RobotGeek 180 degree servo
@@ -97,8 +100,8 @@
 #define GRIPPER_MAX   2100   //full clockwise for 9g servo
 
 //generic deadband limits - not all joystics will center at 512, so these limits remove 'drift' from joysticks that are off-center.
-#define DEADBANDLOW 462   //decrease this value if drift occurs, increase it to increase sensitivity around the center position
-#define DEADBANDHIGH 562  //increase this value if drift occurs, decrease it to increase sensitivity around the center position
+#define DEADBANDLOW 482   //decrease this value if drift occurs, increase it to increase sensitivity around the center position
+#define DEADBANDHIGH 542  //increase this value if drift occurs, decrease it to increase sensitivity around the center position
 
 // Declare servo objects
 Servo BAS_SERVO;    //base servo - RobotGeek Servo
@@ -114,6 +117,13 @@ int Shoulder =1500;    //holds the present position of the Shoulder servo, start
 int Elbow    =1500;    //holds the present position of the Elbow servo, starts at 1500 (centered)
 int Wrist    =1500;    //holds the present position of the wrist servo, starts at 1500 (centered)
 int Gripper  =1500;    //holds the present position of the gripper servo, starts at 1500 (centered)
+
+// Define servo offsets in +/- uS. Adjust if your arm is not centering properly.
+#define BAS_SERVO_ERROR 0 //(+ is CW, - is CCW)
+#define SHL_SERVO_ERROR 0 //(+ is forward, - is backward)
+#define ELB_SERVO_ERROR 0 //(+ is up, - is down)
+#define WRI_SERVO_ERROR 0 //(+ is up, - is down)
+#define GRI_SERVO_ERROR 0 //(+ is tighten grip, - is loosen grip) 
 
 //last read values of analog sensors (Native values, 0-1023)
 int joyBaseVal = 0;     //present value of the base rotation knob (analog 0)
@@ -133,13 +143,15 @@ int joyGripperMapped = 0;   //gripper knob  value, mapped from 1-1023 to GRIPPER
 
 int speed = 10;  //speed modififer, increase this to increase the speed of the movement
 
+int serialtimer = 0;
+
 
 //===================================================================================================
 // Setup 
 //====================================================================================================
 void setup() 
 {
-
+  Serial.begin(38400);
   // Attach servo and set limits
   BAS_SERVO.attach(3, BASE_MIN, BASE_MAX);
   SHL_SERVO.attach(5, SHOULDER_MIN, SHOULDER_MAX);
@@ -266,6 +278,11 @@ void loop()
     
     //Funciton to set PWM Servo positions
     set_servo();
+    
+#ifdef SERIAL_DEBUG
+    serialprintout();
+    serialtimer++;
+#endif    
   }
 
 
@@ -297,12 +314,31 @@ void loop()
 
 void set_servo()
 {
-  BAS_SERVO.writeMicroseconds(Base);
-  WRI_SERVO.writeMicroseconds(Wrist);
-  SHL_SERVO.writeMicroseconds(Shoulder);
-  ELB_SERVO.writeMicroseconds(Elbow);
-  GRI_SERVO.writeMicroseconds(Gripper);
+  BAS_SERVO.writeMicroseconds(Base + BAS_SERVO_ERROR);
+  SHL_SERVO.writeMicroseconds(Shoulder + SHL_SERVO_ERROR);
+  ELB_SERVO.writeMicroseconds(Elbow + ELB_SERVO_ERROR);
+  WRI_SERVO.writeMicroseconds(Wrist + WRI_SERVO_ERROR);
+  GRI_SERVO.writeMicroseconds(Gripper + GRI_SERVO_ERROR);
     delay(10);
+}
+
+void serialprintout()
+{
+  if (serialtimer == 50)
+    {
+      serialtimer = 0;
+      Serial.println("#####################");
+      Serial.print("Base Value: ");
+      Serial.println(Base + BAS_SERVO_ERROR);
+      Serial.print("Shoulder Value: ");
+      Serial.println(Shoulder + SHL_SERVO_ERROR);
+      Serial.print("Elbow Value: ");
+      Serial.println(Elbow + ELB_SERVO_ERROR);
+      Serial.print("Wrist Value: ");
+      Serial.println(Wrist + WRI_SERVO_ERROR);
+      Serial.print("Gripper Value: ");
+      Serial.println(Gripper + GRI_SERVO_ERROR);
+    }
 }
 
 
